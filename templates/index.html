@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Interactive Spatial Analysis of Ames Housing Prices</title>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" crossorigin="" />
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}" />
+  <link rel = "icon" href ="/static/favicon.ico"/>
+</head>
+<body>
+  <header>
+    <div>
+      <h1>Interactive Spatial Analysis of Ames Housing Prices</h1>
+      <p>Linked visual analytics dashboard with spatial mapping, neighborhood summaries, price distributions, model diagnostics, and clustering.</p>
+    </div>
+    <div id="metric-cards"></div>
+  </header>
+
+  <section class="controls">
+    <div class="control">
+      <label for="neighborhood">Neighborhood</label>
+      <select id="neighborhood">
+        <option value = "All">All</option>
+            {% for n in neighborhoods %}
+              <option value ="{{n}}">{{n}}</option>
+            {% endfor %}
+      </select>
+    </div>
+   <div class="control">
+      <label for="metric">Map Coloring</label>
+      <select id="metric">
+        <option value="Sale_Price">Actual Sale Price</option>
+        <option value="Predicted_Price">Predicted Price</option>
+        <option value="Residual">Residual</option>
+        <option value="Cluster">Cluster</option>
+      </select>
+    </div>
+
+    <div class="control">
+      <label for="minPrice">Min Price</label>
+      <input type="number" id="minPrice" placeholder="e.g. 100000" />
+    </div>
+    <div class="control">
+      <label for="maxPrice">Max Price</label>
+      <input type="number" id="maxPrice" placeholder="e.g. 400000" />
+    </div>
+    <div class="control">
+      <label for="minYear">Min Year Built</label>
+      <input type="number" id="minYear" />
+    </div>
+    <div class="control">
+      <label for="maxYear">Max Year Built</label>
+      <input type="number" id="maxYear" />
+    </div>
+    <div class="control">
+      <label for="minQual">Min Overall Quality</label>
+      <input type="number" id="minQual" />
+    </div>
+    <div class="control control-buttons">
+      <button id="applyBtn">Apply Filters</button>
+      <button id="resetBtn">Reset</button>
+    </div>
+  </section>
+
+  <main class="grid">
+    <section class="panel map-panel">
+      <div class="panel-header">
+        <h2>House Map</h2>
+        <span>Click on points for details</span>
+      </div>
+      <div id="map"></div>
+    </section>
+
+    <!-- ── Custom Price Prediction Form ──────────────────────────── -->
+    <section class="panel map-panel">
+      <div class="panel-header">
+        <h2>Custom Price Prediction</h2>
+        <span>Enter house attributes to get a predicted price and 95% confidence interval</span>
+      </div>
+
+      <div class="pred-form-grid">
+        <div class="pred-field">
+          <label for="pred-overall-cond">Overall Condition</label>
+          <select id="pred-overall-cond">
+            <option value="Very_Poor">Very Poor</option>
+            <option value="Poor">Poor</option>
+            <option value="Below_Average">Below Average</option>
+            <option value="Average" selected>Average</option>
+            <option value="Above_Average">Above Average</option>
+            <option value="Good">Good</option>
+            <option value="Very_Good">Very Good</option>
+            <option value="Excellent">Excellent</option>
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-gr-liv-area">Living Area (sq ft)</label>
+          <input type="number" id="pred-gr-liv-area" placeholder="e.g. 1500" min="300" max="6000" />
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-neighborhood">Neighborhood</label>
+          <select id="pred-neighborhood">
+            {% for n in neighborhoods %}
+              <option value="{{ n }}">{{ n }}</option>
+            {% endfor %}
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-year-built">Year Built</label>
+          <input type="number" id="pred-year-built" placeholder="e.g. 1990" min="1872" max="2010" />
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-total-bsmt-sf">Basement SF</label>
+          <input type="number" id="pred-total-bsmt-sf" placeholder="e.g. 800" min="0" max="6000" />
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-garage-cars">Garage Capacity (cars)</label>
+          <select id="pred-garage-cars">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-full-bath">Full Bathrooms</label>
+          <select id="pred-full-bath">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2" selected>2</option>
+            <option value="3">3</option>
+            <option value="4">4</option>
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-bedroom-abvgr">Bedrooms Above Grade</label>
+          <select id="pred-bedroom-abvgr">
+            <option value="0">0</option>
+            <option value="1">1</option>
+            <option value="2">2</option>
+            <option value="3" selected>3</option>
+            <option value="4">4</option>
+            <option value="5">5</option>
+            <option value="6">6</option>
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-house-style">House Style</label>
+          <select id="pred-house-style">
+            <option value="One_Story">One Story</option>
+            <option value="Two_Story">Two Story</option>
+            <option value="One_and_Half_Fin">1.5 Story (Finished)</option>
+            <option value="One_and_Half_Unf">1.5 Story (Unfinished)</option>
+            <option value="Two_and_Half_Fin">2.5 Story (Finished)</option>
+            <option value="Two_and_Half_Unf">2.5 Story (Unfinished)</option>
+            <option value="SFoyer">Split Foyer</option>
+            <option value="SLvl">Split Level</option>
+          </select>
+        </div>
+
+        <div class="pred-field">
+          <label for="pred-central-air">Central Air</label>
+          <select id="pred-central-air">
+            <option value="Y">Yes</option>
+            <option value="N">No</option>
+          </select>
+        </div>
+
+        <div class="pred-field pred-submit-field">
+          <button id="predictBtn">Predict Price</button>
+        </div>
+      </div>
+
+      <!-- Result display -->
+      <div id="pred-result" class="pred-result hidden">
+        <div class="pred-result-top">
+          <div class="pred-result-main">
+            <div class="pred-result-label">Predicted Price</div>
+            <div id="pred-price" class="pred-result-price"></div>
+          </div>
+          <div class="pred-result-interval">
+            <div class="pred-interval-label">95% Prediction Interval</div>
+            <div id="pred-interval" class="pred-interval-values"></div>
+          </div>
+        </div>
+        <div class="pred-shap-section">
+          <div class="pred-shap-title">Feature Contributions (SHAP)</div>
+          <div class="pred-shap-subtitle">How each feature pushed the prediction up or down from the base price</div>
+          <svg id="shap-waterfall"></svg>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Neighborhood Median Prices</h2>
+      </div>
+      <svg id="neighborhoodChart"></svg>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Sale Price Distribution</h2>
+      </div>
+      <svg id="histogram"></svg>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Sale Price vs Living Area</h2>
+      </div>
+      <svg id="scatterplot"></svg>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Top Feature Importances</h2>
+      </div>
+      <svg id="importanceChart"></svg>
+    </section>
+
+    <section class="panel">
+      <div class="panel-header">
+        <h2>Cluster Summary</h2>
+      </div>
+      <svg id="clusterChart"></svg>
+    </section>
+  </main>
+
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" crossorigin=""></script>
+  <script src="https://cdn.jsdelivr.net/npm/d3@7"></script>
+  <script src="{{ url_for('static', filename='js/app.js') }}"></script>
+</body>
+</html>
